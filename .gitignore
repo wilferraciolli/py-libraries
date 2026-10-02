@@ -216,3 +216,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+/NEXT_STEPS11111.md
+.idea/*

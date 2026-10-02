@@ -1,0 +1,25 @@
+# uv workspace root — not a package itself. Each publishable library lives
+# under packages/<name>/ with its own pyproject.toml.
+[project]
+name = "py-libraries"
+version = "0.0.0"
+requires-python = ">=3.13"
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+# TestPyPI, for rehearsing a release: `uv publish --index testpypi`.
+# explicit = true: never used to resolve dependencies, only when named.
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true

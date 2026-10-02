@@ -1,0 +1,41 @@
+[project]
+name = "wiltech-labs-rest"
+version = "0.1.0"
+description = "Response-building core for Wiltech FastAPI apps: the _data/_metadata/_metaLinks/_messages envelope, links and field metadata."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.13"
+authors = [{ name = "Wiliam Ferraciolli" }]
+keywords = ["fastapi", "pydantic", "rest", "hateoas", "api-response"]
+classifiers = [
+    "Framework :: FastAPI",
+    "Framework :: Pydantic :: 2",
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/wilferraciolli/py-libraries/tree/main/packages/rest"
+Repository = "https://github.com/wilferraciolli/py-libraries"
+Conventions = "https://github.com/wilferraciolli/py-libraries/blob/main/docs/PYTHON_APP_CONVENTIONS.md"
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["CLAUDE.md", ".pytest_cache"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wiltech_labs_rest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
