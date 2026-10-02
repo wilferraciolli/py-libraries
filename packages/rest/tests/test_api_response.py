@@ -10,6 +10,9 @@ from wiltech_labs_rest import (
     LinkedResource,
     Message,
     MessageType,
+    NoMetadata,
+    UtcDateTime,
+    as_utc,
     choice_field,
     format_utc_datetime,
 )
@@ -96,6 +99,19 @@ def test_field_metadata_omits_unset_flags():
     assert FieldMetadata(readOnly=False).model_dump() == {"readOnly": False}
 
 
+def test_field_metadata_size_limits():
+    assert FieldMetadata(mandatory=True, maxLength=120).model_dump() == {"mandatory": True, "maxLength": 120}
+    assert FieldMetadata(maxItems=5).model_dump() == {"maxItems": 5}
+    assert FieldMetadata(min=1, max=90, default=30).model_dump() == {"min": 1, "max": 90, "default": 30}
+    assert FieldMetadata(min=0).model_dump() == {"min": 0}
+
+
+def test_no_metadata_serializes_as_empty_object():
+    body = ApiResponse[ThingDTO, NoMetadata].of("thing", _thing(), NoMetadata()).model_dump(by_alias=True)
+
+    assert body["_metadata"] == {}
+
+
 def test_format_utc_datetime():
     assert format_utc_datetime(datetime(2026, 1, 2, 3, 4, 5)) == "2026-01-02T03:04:05Z"
 
@@ -107,3 +123,23 @@ def test_format_utc_datetime_accepts_iso_strings():
     assert format_utc_datetime("2026-01-02T03:04:05.123456+00:00") == "2026-01-02T03:04:05Z"
     assert format_utc_datetime("2026-01-02T03:04:05Z") == "2026-01-02T03:04:05Z"
     assert format_utc_datetime("2026-01-02 03:04:05") == "2026-01-02T03:04:05Z"
+
+
+def test_as_utc():
+    assert as_utc(datetime(2026, 1, 2, 3, 4, 5)) == datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+
+    plus_two = timezone(timedelta(hours=2))
+    converted = as_utc(datetime(2026, 1, 2, 3, 4, 5, tzinfo=plus_two))
+    assert converted == datetime(2026, 1, 2, 1, 4, 5, tzinfo=timezone.utc)
+    assert converted.tzinfo == timezone.utc
+
+
+def test_utc_datetime_makes_stored_strings_comparable():
+    class Row(BaseModel):
+        created_date: UtcDateTime
+
+    naive = Row(created_date="2026-01-02 03:04:05").created_date
+    offset = Row(created_date="2026-01-02T05:04:05+02:00").created_date
+
+    assert naive.tzinfo == timezone.utc
+    assert naive == offset

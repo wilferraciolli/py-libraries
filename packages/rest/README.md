@@ -98,24 +98,53 @@ Everything is imported from `wiltech_labs_rest`:
 | `API_PREFIX` | `"/api"` — the prefix every router is mounted under; use it when building hrefs. |
 | `Link` | `{href, method="GET"}` |
 | `LinkedResource` | DTO base class adding `links: dict[str, Link]` |
-| `FieldMetadata` | `readOnly` / `hidden` / `mandatory` / `values`; unset flags are left out of the JSON |
+| `FieldMetadata` | `readOnly` / `hidden` / `mandatory` / `values`, plus limits `maxLength` (text), `maxItems` (lists), `min` / `max` / `default` (numbers); unset flags are left out of the JSON |
+| `NoMetadata` | `_metadata` for a response with no field rules; serializes as `{}` |
 | `EmbeddedRef` | `{id, value}` — an option in `values`, or an embedded reference |
 | `choice_field(enum)` | Mandatory `FieldMetadata` whose `values` are every member of the enum |
 | `Message`, `MessageType` | One `_messages` entry: `INFO` / `WARNING` / `ERROR` / `SUCCESS` |
 | `format_utc_datetime(value)` | `datetime` or ISO string → `YYYY-MM-DDTHH:MM:SSZ` |
+| `UtcDateTime`, `as_utc(value)` | Field type for database row models: parses stored dates and makes them timezone-aware UTC (naive = UTC), so they compare safely |
 
-## Development, building and publishing
+## Development
 
-See [`docs/PUBLISHING.md`](https://github.com/wilferraciolli/py-libraries/blob/main/docs/PUBLISHING.md)
-for local development, building, and the PyPI release steps.
-
-Quick version, from the repo root:
+From the repo root:
 
 ```bash
 uv sync
 uv run --package wiltech-labs-rest pytest packages/rest
-cd packages/rest
-uv version --bump patch            # or minor / major
-uv build                           # -> ../../dist/
-uv publish ../../dist/wiltech_labs_rest-<version>*
 ```
+
+## Publishing
+
+Released to [TestPyPI](https://test.pypi.org/project/wiltech-labs-rest/) (rehearsal) and
+[PyPI](https://pypi.org/project/wiltech-labs-rest/) (what apps install from). They're separate
+sites with separate accounts and API tokens. Account setup, checking a TestPyPI release and
+fixing errors are covered in
+[`docs/PUBLISHING.md`](https://github.com/wilferraciolli/py-libraries/blob/main/docs/PUBLISHING.md).
+
+```bash
+cd packages/rest
+
+# 1. Test, bump, build
+uv run pytest
+uv version --bump patch                 # or minor / major; skip for the first 0.1.0
+rm -rf ../../dist && uv build           # -> ../../dist/
+
+# 2. TestPyPI (optional rehearsal), using a token from test.pypi.org
+read -rsp "TestPyPI token: " UV_PUBLISH_TOKEN && export UV_PUBLISH_TOKEN && echo
+uv publish --index testpypi ../../dist/*
+unset UV_PUBLISH_TOKEN
+
+# 3. PyPI (the real thing), using a token from pypi.org
+read -rsp "PyPI token: " UV_PUBLISH_TOKEN && export UV_PUBLISH_TOKEN && echo
+uv publish ../../dist/*
+unset UV_PUBLISH_TOKEN
+
+# 4. Commit and tag
+git commit -am "wiltech-labs-rest <version>"
+git tag rest-v<version> && git push && git push --tags
+```
+
+A version number can only be uploaded once to each site. To retry after a fix, bump the
+version and rebuild.

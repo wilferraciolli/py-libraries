@@ -1,6 +1,6 @@
 [project]
 name = "wiltech-labs-rest"
-version = "0.1.0"
+version = "0.2.0"
 description = "Response-building core for Wiltech FastAPI apps: the _data/_metadata/_metaLinks/_messages envelope, links and field metadata."
 readme = "README.md"
 license = "Apache-2.0"

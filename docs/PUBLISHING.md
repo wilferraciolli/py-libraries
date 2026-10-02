@@ -39,21 +39,28 @@ uv --version
 > exists — so `uv` is missing from a normal terminal. Either install it as above, or change that
 > `~/.profile` line to `. "$HOME/snap/code/current/.local/bin/env"`.
 
-### 2. PyPI account and token (only on a computer you publish from)
+### 2. Accounts and tokens (only on a computer you publish from)
 
-1. Create an account at <https://pypi.org/account/register/> and enable 2FA (PyPI requires it to
-   publish).
-2. **Account settings → API tokens → Add API token.** For the very first upload of a new package
-   the token must be scoped to *Entire account* (the project doesn't exist yet). After the first
-   release, replace it with a token scoped to just that project.
-3. Store it so `uv publish` picks it up — e.g. in `~/.bashrc` (never commit it):
-   ```bash
-   export UV_PUBLISH_TOKEN="pypi-AgEI..."
-   ```
-4. For rehearsals, repeat on <https://test.pypi.org> and keep that token separately — pass it with
-   `--token` or swap `UV_PUBLISH_TOKEN` when publishing to TestPyPI.
+TestPyPI and PyPI are **two separate sites with separate accounts and tokens**. A token from
+one is rejected by the other.
 
-Computers that only *use* the libraries need none of this — downloading from PyPI is anonymous.
+| | TestPyPI (rehearsal) | PyPI (the real thing) |
+|---|---|---|
+| Register | <https://test.pypi.org/account/register/> | <https://pypi.org/account/register/> |
+| Tokens page | <https://test.pypi.org/manage/account/token/> | <https://pypi.org/manage/account/token/> |
+| Package page | <https://test.pypi.org/project/wiltech-labs-rest/> | <https://pypi.org/project/wiltech-labs-rest/> |
+| `uv publish` flag | `--index testpypi` | *(none, it's the default)* |
+
+On each site:
+
+1. Register, confirm your email address, and turn on 2FA (both sites require it to upload).
+2. **Account settings → API tokens → Add API token.** For the very first upload of a new
+   package, set the scope to *Entire account* (the project doesn't exist yet). After the first
+   release you can replace it with a token scoped to just that project.
+3. Copy the token straight away; it's shown only once. It's one long line starting with `pypi-`.
+   Keep it in a password manager, never in this repo.
+
+Computers that only *use* the libraries need none of this. Downloading from PyPI is anonymous.
 
 ## Developing a package
 
@@ -66,30 +73,75 @@ uv run --package wiltech-labs-rest pytest packages/rest   # tests for one packag
 
 ## Releasing a new version
 
-Run from the package's folder, e.g. `packages/rest`:
+Every release follows the same steps. Run them from the package's folder, e.g. `packages/rest`.
+
+### Step 1: test, bump, build
 
 ```bash
 cd packages/rest
 
-# 1. Tests pass
-uv run pytest
+uv run pytest                      # tests must pass
 
-# 2. Bump the version in pyproject.toml (semver: patch = fix, minor = new feature, major = breaking)
-uv version --bump patch            # or minor / major; --dry-run to preview
+uv version --bump patch            # patch = fix, minor = new feature, major = breaking change
+                                   # (--dry-run to preview; skip this for the very first 0.1.0)
 
-# 3. Build. Output goes to the workspace's dist/ (repo root); clear old builds first so
-#    only this version gets uploaded.
-rm -rf ../../dist
-uv build
-
-# 4. (optional) Rehearse on TestPyPI, then install it from there in a scratch venv
-uv publish --index testpypi --token "$TEST_PYPI_TOKEN" ../../dist/*
-
-# 5. Publish to PyPI
-uv publish ../../dist/*
+rm -rf ../../dist                  # clear old builds so only this version is uploaded
+uv build                           # writes the .whl and .tar.gz to the repo root's dist/
 ```
 
-Then commit the version bump and tag it, so the source of every release can be found:
+`uv publish --dry-run ../../dist/*` checks the files and the upload address without uploading.
+
+### Step 2: rehearse on TestPyPI (optional, recommended)
+
+```bash
+# Prompt for the TestPyPI token without showing it or saving it in shell history
+read -rsp "TestPyPI token: " UV_PUBLISH_TOKEN && export UV_PUBLISH_TOKEN && echo
+
+uv publish --index testpypi ../../dist/*
+
+unset UV_PUBLISH_TOKEN             # don't leave the test token set for the real publish
+```
+
+`--index testpypi` is defined in the root `pyproject.toml` (it holds TestPyPI's upload URL).
+
+Check it on <https://test.pypi.org/project/wiltech-labs-rest/>, then install it from there in a
+throwaway environment:
+
+```bash
+uv run --no-project \
+  --index https://test.pypi.org/simple/ --index-strategy unsafe-best-match \
+  --with wiltech-labs-rest \
+  python -c "import wiltech_labs_rest as w; print(w.__all__)"
+```
+
+`--index-strategy unsafe-best-match` lets dependencies like `pydantic` come from the real PyPI,
+because TestPyPI's copies of them are incomplete. If uv picks up an older cached copy, add
+`--refresh`.
+
+Publishing to TestPyPI doesn't use up the version number on the real PyPI, as they're
+independent. A version *is* permanent within TestPyPI though, so to retry after a fix, bump the
+version and rebuild.
+
+### Step 3: publish to PyPI
+
+```bash
+read -rsp "PyPI token: " UV_PUBLISH_TOKEN && export UV_PUBLISH_TOKEN && echo
+
+uv publish ../../dist/*
+
+unset UV_PUBLISH_TOKEN
+```
+
+Check it on <https://pypi.org/project/wiltech-labs-rest/>. Once it's there, any app on any
+computer can `uv add wiltech-labs-rest`.
+
+> If you publish often from one computer, you can put `export UV_PUBLISH_TOKEN="pypi-..."` (the
+> **PyPI** one) in `~/.bashrc` instead of typing it each time, and pass the TestPyPI token
+> explicitly with `--token` when rehearsing.
+
+### Step 4: commit and tag
+
+So the source of every release can be found later:
 
 ```bash
 git commit -am "wiltech-labs-rest 0.1.1"
@@ -97,7 +149,14 @@ git tag rest-v0.1.1
 git push && git push --tags
 ```
 
-`uv publish --dry-run ../../dist/*` checks the files and the upload URL without uploading.
+### When publishing fails
+
+| Error | Cause and fix |
+|---|---|
+| `403 Invalid or non-existent authentication information` | Wrong or missing token. Check that it comes from the **same site** you're publishing to (test.pypi.org vs pypi.org), that it was pasted whole including the `pypi-` start, and that the email is confirmed and 2FA is on. If unsure, create a new token. |
+| `403 ... isn't allowed to upload to project` | The token is scoped to a different project, or the package name is taken by someone else. |
+| `400 File already exists` | That version was already uploaded (even if later deleted). Bump the version, rebuild, and publish again. |
+| Old version uploaded | `dist/` still had previous builds. `rm -rf ../../dist`, rebuild. |
 
 ## Using a package in an app
 

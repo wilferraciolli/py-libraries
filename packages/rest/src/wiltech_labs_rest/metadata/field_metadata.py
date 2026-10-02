@@ -18,17 +18,28 @@ class EmbeddedRef(BaseModel):
 class FieldMetadata(BaseModel):
     """
     Describes how a client should treat one field of a resource: whether it
-    is read-only, hidden or mandatory, and the allowed `values` for a
-    choice field. Unset flags are omitted from the response.
+    is read-only, hidden or mandatory, the allowed `values` for a choice
+    field, and size limits (`maxLength` for text, `maxItems` for lists,
+    `min`/`max`/`default` for numbers). Unset flags are omitted from the
+    response.
     """
     readOnly: Optional[bool] = None
     hidden: Optional[bool] = None
     mandatory: Optional[bool] = None
+    maxLength: Optional[int] = None
+    maxItems: Optional[int] = None
+    min: Optional[int] = None
+    max: Optional[int] = None
+    default: Optional[int] = None
     values: Optional[list[EmbeddedRef]] = None
 
     @model_serializer(mode="wrap")
     def _omit_unset_flags(self, handler: SerializerFunctionWrapHandler):
         return {key: value for key, value in handler(self).items() if value is not None}
+
+
+class NoMetadata(BaseModel):
+    """`_metadata` for a response whose fields have no client rules: `{}`."""
 
 
 def choice_field(enum_type: Type[Enum]) -> FieldMetadata:
