@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional, Type
 
-from pydantic import BaseModel, SerializerFunctionWrapHandler, model_serializer
+from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, model_serializer
 
 
 class EmbeddedRef(BaseModel):
@@ -38,6 +38,15 @@ class FieldMetadata(BaseModel):
         return {key: value for key, value in handler(self).items() if value is not None}
 
 
+class MetadataBase(BaseModel):
+    """
+    Base for `{Resource}Metadata` classes whose keys can't all be Python
+    names: a dotted path into a nested object (`driver.licenseStatus`) is
+    declared with an alias, and serialized by it.
+    """
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
 class NoMetadata(BaseModel):
     """`_metadata` for a response whose fields have no client rules: `{}`."""
 
@@ -48,3 +57,13 @@ def choice_field(enum_type: Type[Enum]) -> FieldMetadata:
         mandatory=True,
         values=[EmbeddedRef(id=member.value, value=member.value) for member in enum_type],
     )
+
+
+def read_only(hidden: bool = False) -> FieldMetadata:
+    """A read-only field; `hidden=True` also hides it."""
+    return FieldMetadata(readOnly=True, hidden=True) if hidden else FieldMetadata(readOnly=True)
+
+
+def mandatory(values: Optional[list[EmbeddedRef]] = None) -> FieldMetadata:
+    """A mandatory field, optionally with its allowed `values`."""
+    return FieldMetadata(mandatory=True, values=values)

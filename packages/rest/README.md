@@ -100,11 +100,21 @@ Everything is imported from `wiltech_labs_rest`:
 | `LinkedResource` | DTO base class adding `links: dict[str, Link]` |
 | `FieldMetadata` | `readOnly` / `hidden` / `mandatory` / `values`, plus limits `maxLength` (text), `maxItems` (lists), `min` / `max` / `default` (numbers); unset flags are left out of the JSON |
 | `NoMetadata` | `_metadata` for a response with no field rules; serializes as `{}` |
+| `MetadataBase` | Base for `{Resource}Metadata` classes with dotted keys (`driver.licenseStatus`): declare them with `Field(alias=...)`, serialized by alias |
+| `CamelModel` | Base for a Request/DTO/Metadata with snake_case attributes and camelCase JSON (`bed_number` ↔ `bedNumber`); requests accept either spelling |
+| `CamelLinkedResource`, `CamelMetadataBase` | `LinkedResource` / `MetadataBase` serialized camelCase |
+| `read_only(hidden=False)`, `mandatory(values=None)` | `FieldMetadata` shortcuts |
 | `EmbeddedRef` | `{id, value}` — an option in `values`, or an embedded reference |
 | `choice_field(enum)` | Mandatory `FieldMetadata` whose `values` are every member of the enum |
 | `Message`, `MessageType` | One `_messages` entry: `INFO` / `WARNING` / `ERROR` / `SUCCESS` |
 | `format_utc_datetime(value)` | `datetime` or ISO string → `YYYY-MM-DDTHH:MM:SSZ` |
 | `UtcDateTime`, `as_utc(value)` | Field type for database row models: parses stored dates and makes them timezone-aware UTC (naive = UTC), so they compare safely |
+| `UtcTimestamp` | Field type for DTOs: a `datetime` serialized as `YYYY-MM-DDTHH:MM:SSZ`, with no `@field_serializer` needed |
+| `utc_now()` | Current UTC time at second precision |
+| `to_db_datetime(value)`, `to_db_date(value)` | Store a `datetime` as the API's UTC string, a `date` as `YYYY-MM-DD` (`None` stays `None`) |
+| `Money`, `money(value)` | `Decimal` field sent as a JSON number; `money()` rounds to 2 places, half up |
+| `BlankAsNone` | Validator for optional request fields: `Annotated[Optional[str], BlankAsNone]` turns `""` into `None` |
+| `EmptyIfNone` | Optional string field sent as `""` instead of `null`, for values bound straight into form controls |
 
 ## Development
 

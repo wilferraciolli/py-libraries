@@ -22,6 +22,15 @@ relative to this repo's parent):
 `as_utc` / `UtcDateTime` (from its `src/core/common/base_dto.py` and
 `serializers.py`).
 
+1.0.1 added what `insurly-api` had in its `src/core/common/`: `MetadataBase`,
+`read_only` / `mandatory` (`base_dto.py`), and `utc_now`, `to_db_datetime`,
+`to_db_date`, `money`, `Money`, `BlankAsNone`, `EmptyIfNone` (`serializers.py`).
+insurly's serializing `UtcDateTime` is `UtcTimestamp` here, because
+`UtcDateTime` already meant the row-model validator. It also added
+`CamelModel` / `CamelLinkedResource` / `CamelMetadataBase` (`casing/`), the
+`CamelModel` that `resource-management-api` had in its `src/core/common/base_dto.py`:
+snake_case Python attributes, camelCase JSON.
+
 The wire shape must stay what `@wiltech-labs/ngx-api-client`
 (`../ngx-libraries/packages/api-client`) reads. Changing a field name or
 alias here is a breaking change for every Angular app.
@@ -31,9 +40,11 @@ alias here is a breaking change for every Angular app.
 ```
 src/wiltech_labs_rest/
 ├── __init__.py          # the entire public surface (__all__)
+├── casing/              # CamelModel, CamelLinkedResource, CamelMetadataBase
 ├── response/            # ApiResponse, API_PREFIX, Message, MessageType
 ├── links/               # Link, LinkedResource
-├── metadata/            # FieldMetadata, NoMetadata, EmbeddedRef, choice_field
+├── metadata/            # FieldMetadata, MetadataBase, NoMetadata, EmbeddedRef, choice_field,
+│                        #   read_only, mandatory
 └── serializers/         # format_utc_datetime, as_utc, UtcDateTime
 ```
 

@@ -15,6 +15,16 @@ is the master; other apps are brought in line with it later.
       min/max/default`, `NoMetadata`, `as_utc`, `UtcDateTime`, for `fastapi-ai`.
 - [x] Published **1.0.0** to PyPI (2026-10-02) — 0.2.0's contents, first stable release.
       `fastapi-template` now requires `wiltech-labs-rest>=1.0.0`; smoke test re-run.
+- [x] `wiltech-labs-rest` 1.0.1 (built, **not yet published**) — `insurly-api`'s
+      `core/common/` extras: `MetadataBase`, `read_only`, `mandatory`, `UtcTimestamp`
+      (its serializing `UtcDateTime`), `Money`, `money`, `BlankAsNone`, `EmptyIfNone`,
+      `utc_now`, `to_db_datetime`, `to_db_date`; plus `resource-management-api`'s
+      `CamelModel`, as `CamelModel` / `CamelLinkedResource` / `CamelMetadataBase`.
+- [x] `insurly-api` switched: `core/common/` deleted, everything imported from
+      `wiltech_labs_rest`. Responses verified identical on 19 endpoints; Worker
+      dry-run bundles the package. Needs 1.0.1 on PyPI, then `uv lock`.
+- [x] `resource-management-api` switched: `core/common/` deleted, everything imported
+      from `wiltech_labs_rest`. Needs 1.0.1 on PyPI, then `uv lock`.
 
 ## Next
 
@@ -45,5 +55,3 @@ is the master; other apps are brought in line with it later.
   Cloudflare Workers); also accepts JWKS keys with no `use`.
 - `fastapi-ai` `database.py` uses `CF_D1_ACCOUNT_ID` instead of `CF_ACCOUNT_ID`.
 - `fastapi-ai` adds `core/common/errors.py`, `core/config/cors.py` (per-request CORS origins), `require_owner`.
-- `insurly-api` adds `utc_now`, `Money`, `BlankAsNone`, `UtcDateTime`, `MetadataBase`,
-  `read_only()` / `mandatory()`.
