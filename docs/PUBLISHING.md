@@ -84,6 +84,7 @@ uv run pytest                      # tests must pass
 
 uv version --bump patch            # patch = fix, minor = new feature, major = breaking change
                                    # (--dry-run to preview; skip this for the very first 0.1.0)
+                                   # or set an exact version: uv version 1.0.0
 
 rm -rf ../../dist                  # clear old builds so only this version is uploaded
 uv build                           # writes the .whl and .tar.gz to the repo root's dist/
@@ -134,6 +135,10 @@ unset UV_PUBLISH_TOKEN
 
 Check it on <https://pypi.org/project/wiltech-labs-rest/>. Once it's there, any app on any
 computer can `uv add wiltech-labs-rest`.
+
+PyPI's project page and JSON API can take a few minutes to show a new version (they're cached),
+even though `uv` can already install it. If an app's `uv lock` says the new version doesn't
+exist, run `uv lock --refresh` to bypass uv's own cached copy of the index.
 
 > If you publish often from one computer, you can put `export UV_PUBLISH_TOKEN="pypi-..."` (the
 > **PyPI** one) in `~/.bashrc` instead of typing it each time, and pass the TestPyPI token
