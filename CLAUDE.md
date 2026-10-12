@@ -10,7 +10,10 @@ the last project. The Python counterpart of `../ngx-libraries` (Angular,
 ```
 py-libraries/
 ├── packages/
-│   └── rest/               # wiltech-labs-rest (import: wiltech_labs_rest) — see its own CLAUDE.md
+│   ├── rest/               # wiltech-labs-rest (import: wiltech_labs_rest) — see its own CLAUDE.md
+│   ├── core/               # wiltech-labs-core: config, database, errors, CORS, health
+│   ├── auth/               # wiltech-labs-auth: Clerk JWT, Caller, require_admin/owner (needs core, rest)
+│   └── ai/                 # wiltech-labs-ai: providers, LLM, embeddings, vector stores, agent (needs core)
 ├── docs/
 │   ├── PYTHON_APP_CONVENTIONS.md   # conventions every consuming FastAPI app follows — the
 │   │                               # contract these packages meet

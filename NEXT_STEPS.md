@@ -25,9 +25,24 @@ is the master; other apps are brought in line with it later.
       dry-run bundles the package. Needs 1.0.1 on PyPI, then `uv lock`.
 - [x] `resource-management-api` switched: `core/common/` deleted, everything imported
       from `wiltech_labs_rest`. Needs 1.0.1 on PyPI, then `uv lock`.
+- [x] `wiltech-labs-core`, `wiltech-labs-auth`, `wiltech-labs-ai` 0.1.0 built (in
+      PythonTutorials' `libraries/` staging area, moved here). **Not yet published.**
+      `fastapi-template` already imports core + auth (verified against the local packages).
 
 ## Next
 
+- [ ] Publish in dependency order: **core → auth → ai** (tags `core-v0.1.0`,
+      `auth-v0.1.0`, `ai-v0.1.0`). Then run `uv lock` in `fastapi-template`: its
+      `uv.lock` is stale until core and auth are on PyPI, and the Dockerfile's
+      `uv sync --frozen` would install the old dependency set without complaint.
+- [ ] Switch `fastapi-ai` to core/auth/ai: delete `src/core/config/*`, `core/common/errors.py`,
+      `metrics/status_router.py`, `core/security/*`, `core/ai/*`, `assistant/tools/tool.py`
+      and the loop in `assistant_service.py`; import from the packages instead. Check the
+      differences listed under *Known drift* first.
+- [ ] Verify in a real Python Worker (`pywrangler dev`): the D1 binding `batch()` (uses
+      `pyodide.ffi.to_js`) and bundling of the three packages.
+- [ ] Verify `VectorizeVectorStore` and `QdrantVectorStore` against live services (tests
+      only check the documented REST request shapes with `httpx.MockTransport`).
 - [ ] Switch `fastapi-ai` to `wiltech-labs-rest>=1.0.0` (keeps `core/common/errors.py`,
       which depends on FastAPI).
 - [ ] Add `maxLength` / `maxItems` / `min` / `max` / `default` to `ApiFieldMetadata` in
@@ -39,13 +54,13 @@ is the master; other apps are brought in line with it later.
 
 ## Later candidates (from the template's `core/`)
 
-- [ ] Config: `get_config(request, key)` + `.env` loader.
-- [ ] Database: `Database` protocol, `SQLiteDatabase` + migration runner, `D1BindingDatabase`,
-      `D1HttpDatabase`, `get_database` (SQLite behind an extra, lazy import).
-- [ ] Security: Clerk JWT verification (`get_authenticated_user`), `Caller`, `require_admin`.
-      `get_caller` reads `user_detail_view`, so the lookup needs to become pluggable.
+- [x] Config: `get_config(request, key)` + `.env` loader (wiltech-labs-core).
+- [x] Database: `Database` protocol, `SQLiteDatabase` + migration runner, `D1BindingDatabase`,
+      `D1HttpDatabase`, `get_database` (SQLite behind an extra, lazy import) (wiltech-labs-core).
+- [x] Security: Clerk JWT verification (`get_authenticated_user`), `Caller`, `require_admin`,
+      with a pluggable caller lookup (wiltech-labs-auth).
 - [ ] Link helpers to cut the `f"{API_PREFIX}/…"` + `Link(...)` repetition in services.
-- [ ] App wiring: CORS, `/api` prefix, `/health` router.
+- [x] App wiring: CORS, `/api` prefix, `/health` router (wiltech-labs-core).
 - [ ] Region settings (`shared/settings/region`) as its own package — the Python side of
       `@wiltech-labs/ngx-region-settings`.
 
@@ -55,3 +70,11 @@ is the master; other apps are brought in line with it later.
   Cloudflare Workers); also accepts JWKS keys with no `use`.
 - `fastapi-ai` `database.py` uses `CF_D1_ACCOUNT_ID` instead of `CF_ACCOUNT_ID`.
 - `fastapi-ai` adds `core/common/errors.py`, `core/config/cors.py` (per-request CORS origins), `require_owner`.
+- When `fastapi-ai` switches to core/auth/ai:
+  - `DATABASE_MODE=d1_http` reads `CF_ACCOUNT_ID` (the template's name), not `CF_D1_ACCOUNT_ID`.
+  - `CLERK_AUDIENCE` defaults to `wiltech-dev-api` when unset (template behaviour).
+  - LLM failures raise `UpstreamError` (502) instead of `RuntimeError` (500);
+    `tests/test_llm.py` expects `RuntimeError`.
+  - `roles.to_role()` (case-insensitive Clerk roles) isn't in auth; keep it in the app or add it.
+  - The chat search's `message_embeddings` store isn't ported; `resource_embeddings`
+    (todos, posts) works as is through `DatabaseVectorStore`.

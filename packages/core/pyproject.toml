@@ -1,0 +1,48 @@
+[project]
+name = "wiltech-labs-core"
+version = "0.1.0"
+description = "Runtime plumbing for Wiltech FastAPI apps: config from Worker env or .env, a portable Database (SQLite, Cloudflare D1 binding, D1 over HTTP), errors, CORS and health."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.13"
+authors = [{ name = "Wiliam Ferraciolli" }]
+keywords = ["fastapi", "cloudflare-workers", "d1", "sqlite", "config"]
+classifiers = [
+    "Framework :: FastAPI",
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+dependencies = [
+    "fastapi>=0.110",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# Local uvicorn/Docker only. A Cloudflare Worker uses D1 and must not need it.
+sqlite = ["aiosqlite>=0.20"]
+
+[project.urls]
+Homepage = "https://github.com/wilferraciolli/py-libraries/tree/main/packages/core"
+Repository = "https://github.com/wilferraciolli/py-libraries"
+Conventions = "https://github.com/wilferraciolli/py-libraries/blob/main/docs/PYTHON_APP_CONVENTIONS.md"
+
+[dependency-groups]
+dev = [
+    "aiosqlite",
+    "pytest",
+    "pytest-asyncio",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["CLAUDE.md", ".pytest_cache"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wiltech_labs_core"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
