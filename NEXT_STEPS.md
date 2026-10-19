@@ -31,6 +31,17 @@ is the master; other apps are brought in line with it later.
 
 ## Next
 
+- [ ] Review and publish **`wiltech-labs-core` 1.1.0** (drafted for Crewly, not yet committed):
+      `Database.execute_returning` on every adapter; `UniqueConstraintError` mapped by every
+      adapter (also from `batch`); D1 binding sends `None` as JS `null` (Pyodide's default
+      `undefined` is rejected by D1) and converts result rows to dicts; each SQLite migration
+      runs in one transaction with its bookkeeping row; SQLite turns on `PRAGMA foreign_keys`
+      (D1 enforces foreign keys already, so local runs now match: check other apps' local data).
+      Then `crewly-api` deletes its `core/config/database.py` shim and imports from here.
+- [ ] `wiltech-labs-auth`: the module-level `asyncio.Lock` around the JWKS fetch is still there
+      (`insurly-api` dropped it because it hung Cloudflare Workers, see Known drift). Decide
+      before Crewly runs on Workers.
+
 - [ ] Publish in dependency order: **core → auth → ai** (tags `core-v0.1.0`,
       `auth-v0.1.0`, `ai-v0.1.0`). Then run `uv lock` in `fastapi-template`: its
       `uv.lock` is stale until core and auth are on PyPI, and the Dockerfile's

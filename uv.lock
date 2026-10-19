@@ -492,7 +492,7 @@ wheels = [
 
 [[package]]
 name = "wiltech-labs-ai"
-version = "0.1.0"
+version = "1.0.1"
 source = { editable = "packages/ai" }
 dependencies = [
     { name = "httpx" },
@@ -521,7 +521,7 @@ dev = [
 
 [[package]]
 name = "wiltech-labs-auth"
-version = "0.1.0"
+version = "1.0.1"
 source = { editable = "packages/auth" }
 dependencies = [
     { name = "fastapi" },
@@ -556,7 +556,7 @@ dev = [
 
 [[package]]
 name = "wiltech-labs-core"
-version = "0.1.0"
+version = "1.1.0"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "fastapi" },

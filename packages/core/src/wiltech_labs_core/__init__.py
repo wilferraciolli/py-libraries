@@ -15,6 +15,7 @@ from wiltech_labs_core.database import (
     Database,
     SQLiteDatabase,
     Statement,
+    UniqueConstraintError,
     get_database,
     migrations_dir,
 )
@@ -46,6 +47,7 @@ __all__ = [
     "SQLiteDatabase",
     "Statement",
     "TooManyRequestsError",
+    "UniqueConstraintError",
     "UpstreamError",
     "allowed_origins",
     "database_check",

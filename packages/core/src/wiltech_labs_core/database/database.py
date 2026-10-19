@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from pathlib import Path
 from typing import Any, Optional, Protocol, Sequence
 
@@ -8,6 +9,21 @@ from wiltech_labs_core.config import get_config
 
 # One SQL statement and its parameters, as `batch` takes them.
 Statement = tuple[str, tuple[Any, ...]]
+
+
+class UniqueConstraintError(Exception):
+    """
+    A write broke a UNIQUE constraint or unique index, whatever the backend.
+
+    Repositories catch it and raise their domain's ConflictError ("an employee
+    with this email already exists"), so the message a user sees is written by
+    the app, not by SQLite.
+    """
+
+
+def _is_unique_violation(exc: BaseException | str) -> bool:
+    # SQLite, D1 (which surfaces SQLite's message) and D1 over HTTP all say this.
+    return "UNIQUE constraint failed" in str(exc)
 
 
 def migrations_dir() -> Path:
@@ -39,6 +55,15 @@ class Database(Protocol):
 
     async def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None: ...
 
+    async def execute_returning(self, sql: str, params: tuple[Any, ...] = ()) -> Optional[dict[str, Any]]:
+        """
+        Run one write with a `RETURNING` clause, commit it, and return the first
+        row, or None when no row matched. D1 has no interactive transactions, so a
+        guarded state change is one statement ("UPDATE ... WHERE status = 'OPEN'
+        RETURNING id"), and whether a row came back is how the caller knows it won.
+        """
+        ...
+
     async def batch(self, statements: Sequence[Statement]) -> None:
         """
         Run several writes together. D1 has no interactive transactions, so
@@ -68,57 +93,78 @@ class SQLiteDatabase:
             await conn.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY)"
             )
+            await conn.commit()
             cursor = await conn.execute("SELECT filename FROM schema_migrations")
             applied = {row[0] for row in await cursor.fetchall()}
 
             for migration in sorted(migrations_dir().glob("*.sql")):
                 if migration.name in applied:
                     continue
-                await conn.executescript(migration.read_text())
-                await conn.execute(
-                    "INSERT INTO schema_migrations (filename) VALUES (?)",
-                    (migration.name,),
+                # One transaction per migration, its bookkeeping row included: a migration that
+                # fails half-way leaves nothing behind and runs again next time.
+                name = migration.name.replace("'", "''")
+                await conn.executescript(
+                    f"BEGIN;\n{migration.read_text(encoding='utf-8')}\n"
+                    f"INSERT INTO schema_migrations (filename) VALUES ('{name}');\nCOMMIT;"
                 )
-
-            await conn.commit()
 
         _migrated_paths.add(self._path)
 
-    async def fetch_all(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    async def _connect(self):
         await self._ensure_migrated()
         import aiosqlite
 
-        async with aiosqlite.connect(self._path) as conn:
-            conn.row_factory = aiosqlite.Row
+        conn = await aiosqlite.connect(self._path)
+        conn.row_factory = aiosqlite.Row
+        await conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
+    async def fetch_all(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        conn = await self._connect()
+        try:
             cursor = await conn.execute(sql, params)
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+        finally:
+            await conn.close()
 
     async def fetch_one(self, sql: str, params: tuple[Any, ...] = ()) -> Optional[dict[str, Any]]:
         rows = await self.fetch_all(sql, params)
         return rows[0] if rows else None
 
     async def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
-        await self._ensure_migrated()
-        import aiosqlite
+        await self.execute_returning(sql, params)
 
-        async with aiosqlite.connect(self._path) as conn:
-            await conn.execute(sql, params)
-            await conn.commit()
+    async def execute_returning(self, sql: str, params: tuple[Any, ...] = ()) -> Optional[dict[str, Any]]:
+        conn = await self._connect()
+        try:
+            try:
+                cursor = await conn.execute(sql, params)
+                row = await cursor.fetchone()
+                await conn.commit()
+            except sqlite3.IntegrityError as exc:
+                if _is_unique_violation(exc):
+                    raise UniqueConstraintError(str(exc)) from exc
+                raise
+            return dict(row) if row is not None else None
+        finally:
+            await conn.close()
 
     async def batch(self, statements: Sequence[Statement]) -> None:
         """All statements in one transaction: either every one is applied or none is."""
-        await self._ensure_migrated()
-        import aiosqlite
-
-        async with aiosqlite.connect(self._path) as conn:
+        conn = await self._connect()
+        try:
             try:
                 for sql, params in statements:
                     await conn.execute(sql, params)
                 await conn.commit()
-            except Exception:
+            except Exception as exc:
                 await conn.rollback()
+                if isinstance(exc, sqlite3.IntegrityError) and _is_unique_violation(exc):
+                    raise UniqueConstraintError(str(exc)) from exc
                 raise
+        finally:
+            await conn.close()
 
 
 class D1BindingDatabase:
@@ -126,6 +172,19 @@ class D1BindingDatabase:
 
     def __init__(self, db: Any) -> None:
         self._db = db
+
+    @staticmethod
+    def _bind_params(params: tuple[Any, ...]) -> list[Any]:
+        # Pyodide turns None into JS `undefined`, which D1 rejects: send JS null instead.
+        try:
+            from pyodide.ffi import jsnull
+        except ImportError:  # not in a Worker (tests pass a fake binding)
+            return list(params)
+        return [jsnull if value is None else value for value in params]
+
+    def _statement(self, sql: str, params: tuple[Any, ...]) -> Any:
+        statement = self._db.prepare(sql)
+        return statement.bind(*self._bind_params(params)) if params else statement
 
     @staticmethod
     def _get(value: Any, key: str, default: Any = None) -> Any:
@@ -136,19 +195,49 @@ class D1BindingDatabase:
         except (TypeError, KeyError):
             return getattr(value, key, default)
 
+    @staticmethod
+    def _to_dict(row: Any) -> Optional[dict[str, Any]]:
+        if row is None:
+            return None
+        if hasattr(row, "to_py"):  # a JsProxy object from D1
+            row = row.to_py()
+        return dict(row)
+
+    def _rows(self, result: Any) -> list[dict[str, Any]]:
+        rows = self._get(result, "results", []) or []
+        if hasattr(rows, "to_py"):
+            rows = rows.to_py()
+        return [self._to_dict(row) for row in rows]
+
+    @staticmethod
+    def _raise_unique(exc: BaseException) -> None:
+        if _is_unique_violation(exc):
+            raise UniqueConstraintError(str(exc)) from exc
+
     async def fetch_all(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
-        result = await self._db.prepare(sql).bind(*params).all()
-        return self._get(result, "results", [])
+        return self._rows(await self._statement(sql, params).all())
 
     async def fetch_one(self, sql: str, params: tuple[Any, ...] = ()) -> Optional[dict[str, Any]]:
-        return await self._db.prepare(sql).bind(*params).first()
+        return self._to_dict(await self._statement(sql, params).first())
 
     async def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
-        await self._db.prepare(sql).bind(*params).run()
+        try:
+            await self._statement(sql, params).run()
+        except Exception as exc:  # D1 surfaces SQLite errors as JS exceptions
+            self._raise_unique(exc)
+            raise
+
+    async def execute_returning(self, sql: str, params: tuple[Any, ...] = ()) -> Optional[dict[str, Any]]:
+        try:
+            rows = self._rows(await self._statement(sql, params).all())
+        except Exception as exc:
+            self._raise_unique(exc)
+            raise
+        return rows[0] if rows else None
 
     async def batch(self, statements: Sequence[Statement]) -> None:
         """D1's batch(): the statements run as one implicit transaction."""
-        prepared = [self._db.prepare(sql).bind(*params) for sql, params in statements]
+        prepared = [self._statement(sql, params) for sql, params in statements]
         try:
             # D1 expects a JS array; a Python list reaches JS as a PyProxy.
             from pyodide.ffi import to_js
@@ -156,7 +245,11 @@ class D1BindingDatabase:
             prepared = to_js(prepared)
         except ImportError:  # not in a Worker (tests pass a fake binding)
             pass
-        await self._db.batch(prepared)
+        try:
+            await self._db.batch(prepared)
+        except Exception as exc:
+            self._raise_unique(exc)
+            raise
 
 
 class D1HttpDatabase:
@@ -184,11 +277,16 @@ class D1HttpDatabase:
                 headers=self._headers,
                 json={"sql": sql, "params": list(params)},
             )
+            if response.status_code >= 400 and _is_unique_violation(response.text):
+                raise UniqueConstraintError(response.text)
             response.raise_for_status()
 
         body = response.json()
         if not body.get("success"):
-            raise RuntimeError(f"D1 query failed: {body.get('errors')}")
+            errors = body.get("errors")
+            if _is_unique_violation(str(errors)):
+                raise UniqueConstraintError(str(errors))
+            raise RuntimeError(f"D1 query failed: {errors}")
         return body["result"][0].get("results", [])
 
     async def fetch_all(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
@@ -200,6 +298,10 @@ class D1HttpDatabase:
 
     async def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
         await self._query(sql, params)
+
+    async def execute_returning(self, sql: str, params: tuple[Any, ...] = ()) -> Optional[dict[str, Any]]:
+        rows = await self._query(sql, params)
+        return rows[0] if rows else None
 
     async def batch(self, statements: Sequence[Statement]) -> None:
         """

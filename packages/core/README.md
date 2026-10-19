@@ -81,8 +81,9 @@ import, without overriding anything already set.
 | `get_config(request, key, default=None)` | Config from the Worker env, else `os.environ` |
 | `get_binding(request, name)` | A Cloudflare binding (`env.DB`, `env.AI`, `env.BUCKET`…) or `None` outside a Worker |
 | `load_dotenv(path=None)` | Load `.env` (runs once on import) |
-| `Database` | Protocol: `fetch_all`, `fetch_one`, `execute`, `batch` |
-| `SQLiteDatabase`, `D1BindingDatabase`, `D1HttpDatabase` | The three adapters |
+| `Database` | Protocol: `fetch_all`, `fetch_one`, `execute`, `execute_returning`, `batch` |
+| `SQLiteDatabase`, `D1BindingDatabase`, `D1HttpDatabase` | The three adapters (SQLite turns on foreign keys; D1 binds `None` as `null` and returns rows as dicts) |
+| `UniqueConstraintError` | Raised by every adapter when a UNIQUE constraint or index fails; repositories turn it into their own `ConflictError` |
 | `get_database(request)` | Chooses an adapter from `DATABASE_MODE` / bindings |
 | `Statement` | `tuple[str, tuple]`, one item of `batch` |
 | `migrations_dir()` | The migrations folder, or a `RuntimeError` if it's missing |
@@ -90,6 +91,23 @@ import, without overriding anything already set.
 | `register_error_handlers(app)` | Maps `AppError` to its status code |
 | `EnvCORSMiddleware(app, default_origins="")`, `allowed_origins(scope, default="")` | CORS with origins read per request (fallback `default_origins`); unhandled errors still get CORS headers |
 | `health_router(checks=None, prefix="/health")`, `HealthCheck`, `database_check` | `GET /health`; 503 if any check fails |
+
+### Guarded writes with `execute_returning`
+
+D1 has no interactive transactions, so a state change that must not race is one statement, and
+whether a row comes back says whether it won:
+
+```python
+row = await db.execute_returning(
+    "UPDATE time_entries SET clock_out_at = ? WHERE id = ? AND clock_out_at IS NULL RETURNING id",
+    (now, entry_id),
+)
+if row is None:
+    raise ConflictError("You're not clocked in")
+```
+
+Each migration runs in one transaction with its `schema_migrations` row, so a migration that fails
+half-way leaves nothing behind.
 
 ### `batch` atomicity
 

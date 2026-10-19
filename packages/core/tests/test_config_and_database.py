@@ -8,6 +8,7 @@ from wiltech_labs_core import (
     D1BindingDatabase,
     D1HttpDatabase,
     SQLiteDatabase,
+    UniqueConstraintError,
     get_binding,
     get_config,
     get_database,
@@ -82,27 +83,80 @@ async def test_a_missing_migrations_folder_is_an_error(tmp_path, monkeypatch):
         await SQLiteDatabase(str(tmp_path / "x.db")).fetch_all("SELECT 1")
 
 
+async def test_sqlite_execute_returning_commits_and_returns_the_row(sqlite_db):
+    row = await sqlite_db.execute_returning("INSERT INTO items (id, name) VALUES (?, ?) RETURNING id, name", ("1", "one"))
+    assert row == {"id": "1", "name": "one"}
+    assert await sqlite_db.fetch_one("SELECT name FROM items WHERE id = '1'") == {"name": "one"}
+    # A guarded update that matches nothing returns None: the caller lost the race.
+    assert await sqlite_db.execute_returning("UPDATE items SET name = 'x' WHERE id = '9' RETURNING id") is None
+
+
+async def test_sqlite_unique_violations_raise_unique_constraint_error(sqlite_db):
+    await sqlite_db.execute("INSERT INTO items VALUES (?, ?)", ("1", "one"))
+    with pytest.raises(UniqueConstraintError):
+        await sqlite_db.execute("INSERT INTO items VALUES (?, ?)", ("1", "again"))
+    with pytest.raises(UniqueConstraintError):
+        await sqlite_db.batch([("INSERT INTO items VALUES (?, ?)", ("1", "again"))])
+
+
+async def test_a_failing_migration_leaves_nothing_behind(tmp_path, monkeypatch):
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    (migrations / "001_bad.sql").write_text("CREATE TABLE a (id TEXT); CREATE TABLE a (id TEXT);")
+    monkeypatch.setenv("MIGRATIONS_DIR", str(migrations))
+    db = SQLiteDatabase(str(tmp_path / "bad.db"))
+    with pytest.raises(Exception):
+        await db.fetch_all("SELECT 1")
+    (migrations / "001_bad.sql").write_text("CREATE TABLE a (id TEXT);")
+    assert await db.fetch_all("SELECT name FROM sqlite_master WHERE name = 'a'") == [{"name": "a"}]
+
+
 class FakeStatement:
-    def __init__(self, log, sql):
-        self.log, self.sql, self.params = log, sql, ()
+    def __init__(self, log, sql, rows=None, error=None):
+        self.log, self.sql, self.params, self.rows, self.error = log, sql, (), rows or [], error
 
     def bind(self, *params):
         self.params = params
         return self
 
     async def run(self):
+        if self.error:
+            raise self.error
         self.log.append(("run", self.sql, self.params))
+
+    async def all(self):
+        if self.error:
+            raise self.error
+        self.log.append(("all", self.sql, self.params))
+        return {"results": self.rows}
+
+    async def first(self):
+        return self.rows[0] if self.rows else None
 
 
 class FakeD1:
-    def __init__(self):
-        self.log = []
+    def __init__(self, rows=None, error=None):
+        self.log, self.rows, self.error = [], rows, error
 
     def prepare(self, sql):
-        return FakeStatement(self.log, sql)
+        return FakeStatement(self.log, sql, self.rows, self.error)
 
     async def batch(self, statements):
+        if self.error:
+            raise self.error
         self.log.append(("batch", [(s.sql, s.params) for s in statements]))
+
+
+async def test_d1_binding_execute_returning_reads_the_row():
+    d1 = FakeD1(rows=[{"id": "1"}])
+    assert await D1BindingDatabase(d1).execute_returning("UPDATE t SET x = ? RETURNING id", (None,)) == {"id": "1"}
+    assert d1.log == [("all", "UPDATE t SET x = ? RETURNING id", (None,))]
+
+
+async def test_d1_binding_maps_unique_violations():
+    d1 = FakeD1(error=RuntimeError("D1_ERROR: UNIQUE constraint failed: items.id: SQLITE_CONSTRAINT"))
+    with pytest.raises(UniqueConstraintError):
+        await D1BindingDatabase(d1).execute("INSERT INTO items VALUES (?)", ("1",))
 
 
 async def test_d1_binding_batch_prepares_every_statement_and_sends_one_batch():

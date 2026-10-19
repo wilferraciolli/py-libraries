@@ -1,6 +1,6 @@
 [project]
 name = "wiltech-labs-auth"
-version = "0.1.0"
+version = "1.0.1"
 description = "Authentication and authorization for Wiltech FastAPI apps: Clerk JWT verification, the Caller with saved roles, require_admin / require_owner, service API keys and Clerk webhook verification."
 readme = "README.md"
 license = "Apache-2.0"

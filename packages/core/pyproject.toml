@@ -1,6 +1,6 @@
 [project]
 name = "wiltech-labs-core"
-version = "0.1.0"
+version = "1.1.0"
 description = "Runtime plumbing for Wiltech FastAPI apps: config from Worker env or .env, a portable Database (SQLite, Cloudflare D1 binding, D1 over HTTP), errors, CORS and health."
 readme = "README.md"
 license = "Apache-2.0"
