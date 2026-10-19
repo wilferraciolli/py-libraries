@@ -1424,6 +1424,19 @@ Prefer this:
 
 with HTTP status `404`.
 
+Clients therefore see exactly two error bodies, and the Angular apps rely on that:
+
+| Source | Body |
+|---|---|
+| Any `AppError` (through `register_error_handlers`) | `{"detail": "Todo not found"}` |
+| FastAPI/Pydantic request validation (`422`) | `{"detail": [{"loc": ["body", "email"], "msg": "…", "type": "…"}]}` |
+
+`@wiltech-labs/ngx-api-client` reads both (`apiErrorMessage()` for a banner,
+`fieldErrorsByField()` for form fields), so keep error messages short, fixed and
+written for the person using the app, and don't invent a third shape (no extra
+keys, no success-shaped error envelope). A validator's `ValueError` message is
+what the user sees, minus Pydantic's `Value error, ` prefix.
+
 ## SQL conventions
 
 Use parameterized SQL only.
