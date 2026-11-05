@@ -3,7 +3,7 @@ wiltech-labs-auth: who is calling a Wiltech FastAPI app, and may they?
 
 Clerk JWT verification, the Caller with the roles saved in the app's
 database, require_admin / require_owner, service API keys for app-to-app
-calls, and Clerk (Svix) webhook verification.
+calls, Clerk (Svix) webhook verification, and Clerk invitations.
 
 This module is the entire public surface — import from `wiltech_labs_auth`,
 not from its sub-packages.
@@ -29,7 +29,17 @@ from wiltech_labs_auth.authorization import (
     require_admin,
     require_owner,
 )
-from wiltech_labs_auth.clerk import AuthenticatedUser, get_authenticated_user
+from wiltech_labs_auth.clerk import (
+    CLERK_API_URL,
+    AuthenticatedUser,
+    ClerkInviter,
+    Invitation,
+    InvitationError,
+    Inviter,
+    ManualInviter,
+    get_authenticated_user,
+    get_inviter,
+)
 from wiltech_labs_auth.roles import ROLE_LABELS, UserRole, parse_role_ids, role_options
 from wiltech_labs_auth.webhooks import WebhookVerificationError, clerk_webhook_event, verify_svix_signature
 
@@ -39,8 +49,14 @@ __all__ = [
     "ApiKeyModel",
     "ApiKeyRepository",
     "AuthenticatedUser",
+    "CLERK_API_URL",
+    "ClerkInviter",
     "Caller",
     "CallerLookup",
+    "Invitation",
+    "InvitationError",
+    "Inviter",
+    "ManualInviter",
     "ROLE_LABELS",
     "SavedUser",
     "ServiceCaller",
@@ -53,6 +69,7 @@ __all__ = [
     "get_authenticated_user",
     "get_caller",
     "get_caller_lookup",
+    "get_inviter",
     "hash_api_key",
     "parse_role_ids",
     "require_admin",

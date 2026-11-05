@@ -103,6 +103,24 @@ async def clerk(event: dict = Depends(clerk_webhook_event)):
 
 `verify_svix_signature(secret, headers, raw_body)` is also exported for non-FastAPI use.
 
+### Inviting someone (Clerk invitations)
+
+Clerk emails them a sign-up link (`POST /v1/invitations`, `notify`, `ignore_existing`). Without
+`CLERK_SECRET_KEY`, `get_inviter` returns a `ManualInviter` whose `invite()` sends nothing and
+returns `None`, so the app can tell the person to sign up some other way.
+
+```python
+from wiltech_labs_auth import Inviter, InvitationError, get_inviter
+
+@router.post("/people/{person_id}/invitation")
+async def invite(person_id: str, inviter: Inviter = Depends(get_inviter)):
+    invitation = await inviter.invite("eleni@example.com", redirect_url="https://app.example.com/welcome")
+    return {"sent": invitation is not None}
+```
+
+`InvitationError` carries Clerk's own message when it refuses. Tests pass `ClerkInviter(secret,
+transport=httpx.MockTransport(...))`.
+
 ## Configuration
 
 | Variable | Used by | Notes |
@@ -111,6 +129,7 @@ async def clerk(event: dict = Depends(clerk_webhook_event)):
 | `CLERK_AUDIENCE` | `get_authenticated_user` | Default `wiltech-dev-api` (as in the template) |
 | `CLERK_AUTHORIZED_PARTIES` | `get_authenticated_user` | Optional, comma-separated allowed `azp` |
 | `CLERK_WEBHOOK_SECRET` | `clerk_webhook_event` | `whsec_...` |
+| `CLERK_SECRET_KEY` | `get_inviter` | `sk_...`; optional: without it nothing is sent |
 
 ## Public API
 
@@ -126,6 +145,7 @@ async def clerk(event: dict = Depends(clerk_webhook_event)):
 | `ApiKeyRepository`, `ApiKeyModel`, `API_KEYS_TABLE_SQL`, `get_api_key_repository` | Key storage |
 | `generate_api_key()`, `hash_api_key()`, `API_KEY_HEADER` | Key helpers |
 | `clerk_webhook_event`, `verify_svix_signature`, `WebhookVerificationError` | Webhook verification |
+| `get_inviter`, `Inviter`, `ClerkInviter`, `ManualInviter`, `Invitation`, `InvitationError`, `CLERK_API_URL` | Clerk invitations (sign-up links by email) |
 
 ## Development
 
