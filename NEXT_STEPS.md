@@ -31,6 +31,12 @@ is the master; other apps are brought in line with it later.
 
 ## Next
 
+- [x] **`wiltech-labs-holidays` 1.0.0** published (2026-10-23): a locale (`el-CY`) in,
+      `PublicHoliday` items (`date`, `name`, `category`, `country`) out, on the `holidays`
+      package; `holidays_router()` behind the `router` extra. Counterpart:
+      `@wiltech-labs/ngx-calendar` 1.0.3's `holidays` input. Crewly depends on it (its copy is
+      gone). Still unverified in a Python Worker (pure Python, should bundle).
+
 - [ ] Review and publish **`wiltech-labs-core` 1.1.0** (drafted for Crewly, not yet committed):
       `Database.execute_returning` on every adapter; `UniqueConstraintError` mapped by every
       adapter (also from `batch`); D1 binding sends `None` as JS `null` (Pyodide's default
@@ -38,6 +44,19 @@ is the master; other apps are brought in line with it later.
       runs in one transaction with its bookkeeping row; SQLite turns on `PRAGMA foreign_keys`
       (D1 enforces foreign keys already, so local runs now match: check other apps' local data).
       Then `crewly-api` deletes its `core/config/database.py` shim and imports from here.
+- [ ] Review and publish **`wiltech-labs-core` 1.1.1** (new, 2026-10-24, not committed): portable
+      file storage, `FileStore` with `LocalFileStore` (a folder) and `R2BindingFileStore` (a
+      Worker's R2 bucket binding), chosen by `get_file_store(request)` (`FILE_STORE_MODE`,
+      `FILE_STORE_BINDING`, `FILES_DIR`); keys checked so a user's file name never becomes a path.
+      Needed by Crewly's documents (02·2d), which keeps a `TEMPORARY` copy in
+      `crewly-api/src/core/files/` until this is on PyPI. The R2 adapter is unverified in a real
+      Worker (written against the R2 binding API, tested with a fake bucket).
+- [ ] Review and publish **`wiltech-labs-auth` 1.0.2** (new, 2026-10-28, not committed): Clerk
+      invitations, `get_inviter(request)` giving a `ClerkInviter` (`POST /v1/invitations` with
+      `notify` and `ignore_existing`, `CLERK_SECRET_KEY`) or, without a key, a `ManualInviter` that
+      sends nothing; `InvitationError` carries Clerk's message. Needed by Crewly's pre-boarding
+      (03·3b), which keeps a `TEMPORARY` copy in `crewly-api/src/core/invitations/` until this is on
+      PyPI. Tested with `httpx.MockTransport`, not yet against Clerk itself.
 - [ ] `wiltech-labs-auth`: the module-level `asyncio.Lock` around the JWKS fetch is still there
       (`insurly-api` dropped it because it hung Cloudflare Workers, see Known drift). Decide
       before Crewly runs on Workers.

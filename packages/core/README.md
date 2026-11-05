@@ -69,6 +69,9 @@ await db.batch([
 | `MIGRATIONS_DIR` | sqlite migrations | `./migrations` (relative to the working directory) |
 | `CF_ACCOUNT_ID`, `CF_D1_DATABASE_ID`, `CF_D1_API_TOKEN` | d1_http | — |
 | `CORS_ORIGINS` | `EnvCORSMiddleware` | none (comma-separated) |
+| `FILE_STORE_MODE` | `get_file_store` | `r2_binding` if the binding exists, else `local` |
+| `FILE_STORE_BINDING` | r2_binding | `FILES` (the R2 bucket binding's name in `wrangler.jsonc`) |
+| `FILES_DIR` | local | `./files` |
 
 Values come from the Worker env (`wrangler.jsonc` vars and secrets) first, then the process
 environment. `.env` in the working directory is loaded into the process environment on
@@ -87,6 +90,10 @@ import, without overriding anything already set.
 | `get_database(request)` | Chooses an adapter from `DATABASE_MODE` / bindings |
 | `Statement` | `tuple[str, tuple]`, one item of `batch` |
 | `migrations_dir()` | The migrations folder, or a `RuntimeError` if it's missing |
+| `FileStore` | Protocol: `put(key, data, content_type)`, `get(key) -> StoredFile \| None`, `delete(key)` |
+| `LocalFileStore(root)`, `R2BindingFileStore(bucket)` | A folder (content type kept beside each file), and a Worker's R2 bucket binding |
+| `get_file_store(request)` | Chooses a store from `FILE_STORE_MODE` / bindings |
+| `StoredFile`, `check_key(key)` | A file read back (`key`, `data`, `content_type`, `size`); keys are slash-separated `[A-Za-z0-9._-]` segments, never `..`, so a user's file name never becomes a path |
 | `AppError`, `NotFoundError` (404), `ForbiddenError` (403), `ConflictError` (409), `InvalidInputError` (422), `TooManyRequestsError` (429 + `Retry-After`), `UpstreamError` (502), `NotConfiguredError` (503) | Business errors services raise |
 | `register_error_handlers(app)` | Maps `AppError` to its status code |
 | `EnvCORSMiddleware(app, default_origins="")`, `allowed_origins(scope, default="")` | CORS with origins read per request (fallback `default_origins`); unhandled errors still get CORS headers |
@@ -108,6 +115,20 @@ if row is None:
 
 Each migration runs in one transaction with its `schema_migrations` row, so a migration that fails
 half-way leaves nothing behind.
+
+### Files
+
+```python
+from wiltech_labs_core import get_file_store
+
+store = get_file_store(request)
+await store.put(f"documents/{org_id}/{document_id}", data, "application/pdf")
+found = await store.get(f"documents/{org_id}/{document_id}")  # StoredFile or None
+```
+
+Keys are the app's own; keep the user's file name in the database. Files are held in memory
+whole: fine for documents and images, not for video. On Cloudflare add an R2 bucket binding
+(`"r2_buckets": [{"binding": "FILES", "bucket_name": "..."}]`); locally files land in `FILES_DIR`.
 
 ### `batch` atomicity
 

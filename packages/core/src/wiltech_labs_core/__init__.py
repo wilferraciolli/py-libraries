@@ -2,8 +2,9 @@
 wiltech-labs-core: the runtime plumbing shared by Wiltech's FastAPI apps.
 
 Config that reads the Worker env or .env, the portable Database protocol
-(SQLite / D1 binding / D1 over HTTP), the AppError family, per-request CORS
-and a health router.
+(SQLite / D1 binding / D1 over HTTP), portable file storage (a local folder /
+an R2 bucket binding), the AppError family, per-request CORS and a health
+router.
 
 This module is the entire public surface — import from `wiltech_labs_core`,
 not from its sub-packages.
@@ -19,6 +20,15 @@ from wiltech_labs_core.database import (
     get_database,
     migrations_dir,
 )
+from wiltech_labs_core.files import (
+    DEFAULT_CONTENT_TYPE,
+    FileStore,
+    LocalFileStore,
+    R2BindingFileStore,
+    StoredFile,
+    check_key,
+    get_file_store,
+)
 from wiltech_labs_core.errors import (
     AppError,
     ConflictError,
@@ -33,6 +43,13 @@ from wiltech_labs_core.errors import (
 from wiltech_labs_core.web import EnvCORSMiddleware, HealthCheck, allowed_origins, database_check, health_router
 
 __all__ = [
+    "DEFAULT_CONTENT_TYPE",
+    "FileStore",
+    "LocalFileStore",
+    "R2BindingFileStore",
+    "StoredFile",
+    "check_key",
+    "get_file_store",
     "AppError",
     "ConflictError",
     "D1BindingDatabase",
