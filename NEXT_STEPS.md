@@ -31,6 +31,18 @@ is the master; other apps are brought in line with it later.
 
 ## Next
 
+- [ ] Review and publish **`wiltech-labs-ai` 1.0.2** (new, 2026-11-12, not committed): provider
+      fallback, `get_fallback_ai(request, ("groq", "cloudflare"))` giving a `FallbackAI` that tries
+      each configured provider in order (`AI_PROVIDERS` overrides it) and returns a
+      `FallbackReply` (`text`, `provider`, `model`, `failed`); unconfigured providers are skipped,
+      every provider failing is one `UpstreamError`. Fixes: `get_ai` raises `NotConfiguredError`
+      (503) for a missing key instead of `RuntimeError` (500); `AiHttpAdapter` raises
+      `UpstreamError` (502) with the body logged instead of `httpx.HTTPStatusError` /
+      `RuntimeError`; `OpenAICompatibleChatAdapter` passes `max_tokens`, `temperature`, `top_p`,
+      `response_format` on. Needed by `wiltech-labs-apps/ContentGenerator/ai-content-generator-api`,
+      which keeps a `TEMPORARY` copy in `src/core/ai/` until this is on PyPI. Tested with fakes and
+      `httpx.MockTransport`, not yet against Groq or Workers AI.
+
 - [x] **`wiltech-labs-holidays` 1.0.0** published (2026-10-23): a locale (`el-CY`) in,
       `PublicHoliday` items (`date`, `name`, `category`, `country`) out, on the `holidays`
       package; `holidays_router()` behind the `router` extra. Counterpart:

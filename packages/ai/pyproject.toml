@@ -1,7 +1,7 @@
 [project]
 name = "wiltech-labs-ai"
-version = "1.0.1"
-description = "AI building blocks for Wiltech FastAPI apps: Workers AI / Groq / Ollama behind one protocol, OpenAI-compatible tool calling over httpx, embeddings, portable vector stores (database, Vectorize, Qdrant), hybrid-search fusion and a tool-calling agent loop."
+version = "1.0.2"
+description = "AI building blocks for Wiltech FastAPI apps: Workers AI / Groq / Ollama behind one protocol with fallback between them, OpenAI-compatible tool calling over httpx, embeddings, portable vector stores (database, Vectorize, Qdrant), hybrid-search fusion and a tool-calling agent loop."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.13"

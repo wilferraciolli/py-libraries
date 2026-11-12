@@ -1,9 +1,12 @@
+import logging
 from typing import Any, Literal, Optional, Protocol
 
 import httpx
 from starlette.requests import HTTPConnection
 
-from wiltech_labs_core import get_config
+from wiltech_labs_core import NotConfiguredError, UpstreamError, get_config
+
+logger = logging.getLogger(__name__)
 
 # The LLM providers an app can talk to. "local" is any OpenAI-compatible
 # server you run yourself — Ollama on the home server by default.
@@ -11,6 +14,10 @@ ChatProvider = Literal["cloudflare", "groq", "local"]
 
 DEFAULT_LOCAL_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible API
 DEFAULT_LOCAL_API_KEY = "ollama"  # Ollama ignores it, but the header must be present
+
+# Generation options OpenAICompatibleChatAdapter passes on from `inputs`, besides the messages.
+# Workers AI takes the same names, so one `inputs` dict works for every provider.
+CHAT_OPTIONS = ("max_tokens", "temperature", "top_p", "response_format")
 
 
 class AI(Protocol):
@@ -50,11 +57,16 @@ class AiHttpAdapter:
                 headers=self._headers,
                 json=inputs,
             )
-            response.raise_for_status()
+
+        # Same as chat_completion: the provider's body goes to the log, not the client.
+        if response.status_code >= 400:
+            logger.warning("Workers AI request failed (%s): %s", response.status_code, response.text[:300])
+            raise UpstreamError(f"Workers AI returned {response.status_code}")
 
         body = response.json()
         if not body.get("success"):
-            raise RuntimeError(f"Workers AI request failed: {body.get('errors')}")
+            logger.warning("Workers AI request failed: %s", str(body.get("errors"))[:300])
+            raise UpstreamError("Workers AI could not answer")
 
         return body["result"]
 
@@ -63,7 +75,8 @@ class OpenAICompatibleChatAdapter:
     """
     Plain chat (no tools) through any OpenAI-compatible chat-completions API:
     Groq, Ollama, or Workers AI's /ai/v1. Speaks the AI protocol, returning
-    {"response": text} like Workers AI text models do.
+    {"response": text} like Workers AI text models do. `inputs` keys in
+    CHAT_OPTIONS (max_tokens, temperature, ...) are passed on; others are not.
     """
 
     def __init__(self, api_key: str, base_url: str, transport: Optional[httpx.AsyncBaseTransport] = None) -> None:
@@ -74,9 +87,9 @@ class OpenAICompatibleChatAdapter:
     async def run(self, model: str, inputs: dict[str, Any]) -> dict[str, Any]:
         from wiltech_labs_ai.llm.llm import chat_completion
 
-        message = await chat_completion(
-            self._api_key, self._base_url, {"model": model, "messages": inputs["messages"]}, self._transport
-        )
+        payload: dict[str, Any] = {"model": model, "messages": inputs["messages"]}
+        payload.update({key: inputs[key] for key in CHAT_OPTIONS if inputs.get(key) is not None})
+        message = await chat_completion(self._api_key, self._base_url, payload, self._transport)
         return {"response": message.get("content") or ""}
 
 
@@ -103,12 +116,15 @@ def get_ai(request: HTTPConnection, provider: ChatProvider = "cloudflare") -> AI
     "prefer the native binding inside Workers" rule get_database follows for
     D1) — otherwise http, so local uvicorn/Docker and any non-Worker host
     work without extra configuration beyond an API token.
+
+    A missing key raises NotConfiguredError (503), so get_fallback_ai can
+    skip a provider that isn't set up.
     """
     if provider == "groq":
         api_key = get_config(request, "GROQ_API_KEY")
         base_url = get_config(request, "GROQ_BASE_URL")
         if not api_key or not base_url:
-            raise RuntimeError("Groq requires GROQ_API_KEY and GROQ_BASE_URL")
+            raise NotConfiguredError("Groq requires GROQ_API_KEY and GROQ_BASE_URL")
         return OpenAICompatibleChatAdapter(api_key, base_url)
 
     if provider == "local":
@@ -123,14 +139,14 @@ def get_ai(request: HTTPConnection, provider: ChatProvider = "cloudflare") -> AI
 
     if mode == "binding":
         if not has_ai_binding:
-            raise RuntimeError("AI_MODE='binding' requires a Cloudflare Workers env.AI binding")
+            raise NotConfiguredError("AI_MODE='binding' requires a Cloudflare Workers env.AI binding")
         return AiBindingAdapter(env.AI)
 
     if mode == "http":
         account_id = get_config(request, "CF_AI_ACCOUNT_ID")
         api_token = get_config(request, "CF_AI_API_TOKEN")
         if not account_id or not api_token:
-            raise RuntimeError("AI_MODE='http' requires CF_AI_ACCOUNT_ID and CF_AI_API_TOKEN")
+            raise NotConfiguredError("AI_MODE='http' requires CF_AI_ACCOUNT_ID and CF_AI_API_TOKEN")
         return AiHttpAdapter(account_id, api_token)
 
     raise RuntimeError(f"unknown AI_MODE: {mode!r}")

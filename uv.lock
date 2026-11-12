@@ -526,7 +526,7 @@ wheels = [
 
 [[package]]
 name = "wiltech-labs-ai"
-version = "1.0.1"
+version = "1.0.2"
 source = { editable = "packages/ai" }
 dependencies = [
     { name = "httpx" },

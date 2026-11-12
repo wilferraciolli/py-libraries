@@ -1,5 +1,6 @@
 from wiltech_labs_ai.providers.ai import (
     AI,
+    CHAT_OPTIONS,
     AiBindingAdapter,
     AiHttpAdapter,
     ChatProvider,
@@ -8,14 +9,33 @@ from wiltech_labs_ai.providers.ai import (
     get_ai,
     workers_ai_openai_base_url,
 )
+from wiltech_labs_ai.providers.fallback import (
+    MODEL_CONFIG_KEYS,
+    PROVIDERS_CONFIG_KEY,
+    AiCandidate,
+    FallbackAI,
+    FallbackReply,
+    chat_model,
+    get_fallback_ai,
+    provider_order,
+)
 
 __all__ = [
     "AI",
     "AiBindingAdapter",
+    "AiCandidate",
     "AiHttpAdapter",
+    "CHAT_OPTIONS",
     "ChatProvider",
+    "FallbackAI",
+    "FallbackReply",
     "GroqAdapter",
+    "MODEL_CONFIG_KEYS",
     "OpenAICompatibleChatAdapter",
+    "PROVIDERS_CONFIG_KEY",
+    "chat_model",
     "get_ai",
+    "get_fallback_ai",
+    "provider_order",
     "workers_ai_openai_base_url",
 ]

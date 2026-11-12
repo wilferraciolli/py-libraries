@@ -6,6 +6,7 @@ no AI code, so everything here comes from `fastapi-ai` (`../PythonTutorials/Tuto
 | Here | Origin |
 |---|---|
 | `providers/ai.py` | `src/core/ai/ai.py`. `GroqAdapter` generalised to `OpenAICompatibleChatAdapter` (alias kept); new `local` provider (Ollama) |
+| `providers/fallback.py` | New in 1.0.2, for `ContentGenerator/ai-content-generator-api` (Groq first, Workers AI when Groq can't answer). `FallbackReply.text` turns Workers AI's already-parsed JSON answers back into text (seen live with `@cf/meta/llama-3.1-8b-instruct`) |
 | `llm/llm.py` | `src/core/ai/llm.py`. Errors are now `UpstreamError` (502) with the provider body logged, not returned (was `RuntimeError` with the body in the message); `tools` is omitted when empty. `get_tool_llm` is lifted from `assistant/assistant_router.py` |
 | `embeddings/embeddings.py` | `src/core/ai/embeddings.py`, plus `embed_openai_compatible` and `EMBEDDING_PROVIDER=local` |
 | `vectors/` | `src/core/ai/resource_vector_store.py` generalised: `VectorRecord` / `VectorMatch`, scopes as a list, `existing_ids` instead of `indexed_ids` (works on Vectorize too), chunked for D1's 100-parameter limit. Same `resource_embeddings` table. Vectorize and Qdrant adapters are new |

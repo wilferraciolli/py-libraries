@@ -4,6 +4,8 @@ AI building blocks for Wiltech FastAPI apps:
 
 - **Providers**: Workers AI (binding or REST), Groq and **Ollama/any OpenAI-compatible
   server** behind one `AI` protocol.
+- **Fallback**: `FallbackAI` asks providers in order (e.g. Groq, then Workers AI) until one
+  answers.
 - **Tool calling**: `OpenAICompatibleLlm` over plain `httpx` (no `openai` package, which costs
   about 1.4 s of CPU on a Python Worker cold start).
 - **Embeddings**: Workers AI or Ollama.
@@ -33,6 +35,29 @@ ai = get_ai(request, provider)              # "cloudflare" | "groq" | "local"
 reply = await ai.run(model, {"messages": [{"role": "user", "content": "Hello"}]})
 reply["response"]
 ```
+
+`inputs` may also carry `max_tokens`, `temperature`, `top_p` and `response_format`. Workers AI
+takes them as they are, and the OpenAI-compatible adapter (Groq, Ollama) passes exactly these
+on. Set `max_tokens` for anything longer than a few sentences: Workers AI text models stop at
+256 tokens by default.
+
+### Fallback between providers
+
+```python
+from wiltech_labs_ai import get_fallback_ai
+
+ai = get_fallback_ai(request, ("groq", "cloudflare"))   # AI_PROVIDERS overrides the order
+reply = await ai.run({"messages": messages, "max_tokens": 1200})
+reply.text, reply.provider, reply.model, reply.failed   # "...", "cloudflare", "@cf/...", ("groq",)
+```
+
+- Each provider answers with its own model: `GROQ_MODEL`, `CF_AI_MODEL`, `LOCAL_LLM_MODEL`.
+- A provider whose key or model isn't set is skipped, so one deployment can run on Groq alone,
+  Workers AI alone, or both. None configured: `NotConfiguredError` (503).
+- Any failure moves on to the next provider: an error status (Groq's 429 included), a timeout, a
+  Worker binding error, or a blank answer. The reason is logged, not returned.
+- Every provider failing is one `UpstreamError` (502).
+- Store `reply.provider` and `reply.model` with what you generate, so you know which model wrote it.
 
 ### "Ask your data": tools + agent
 
@@ -98,6 +123,7 @@ All three are interchangeable behind `VectorStore`. Switching store means re-emb
 
 | Variable | Used by | Default |
 |---|---|---|
+| `AI_PROVIDERS` | `get_fallback_ai` | the app's default order, e.g. `groq,cloudflare` |
 | `AI_MODE` | `get_ai("cloudflare")` | `binding` if `env.AI` exists, else `http` |
 | `CF_AI_ACCOUNT_ID`, `CF_AI_API_TOKEN` | Workers AI REST, `get_tool_llm("cloudflare")` | — |
 | `CF_AI_MODEL` | `get_tool_llm("cloudflare")` | — |
@@ -114,7 +140,8 @@ All three are interchangeable behind `VectorStore`. Switching store means re-emb
 | Name | What it is |
 |---|---|
 | `AI`, `get_ai(request, provider)`, `ChatProvider` | Run a model: `run(model, inputs) -> dict` |
-| `AiBindingAdapter`, `AiHttpAdapter`, `OpenAICompatibleChatAdapter` (alias `GroqAdapter`) | The adapters |
+| `AiBindingAdapter`, `AiHttpAdapter`, `OpenAICompatibleChatAdapter` (alias `GroqAdapter`), `CHAT_OPTIONS` | The adapters; a missing key is `NotConfiguredError` (503), a Workers AI REST failure `UpstreamError` (502) |
+| `FallbackAI`, `AiCandidate`, `FallbackReply`, `get_fallback_ai(request, default_providers)`, `chat_model`, `provider_order`, `MODEL_CONFIG_KEYS`, `PROVIDERS_CONFIG_KEY` | Try providers in order until one answers |
 | `workers_ai_openai_base_url(account_id)` | `…/accounts/{id}/ai/v1` |
 | `ToolLlm`, `OpenAICompatibleLlm`, `chat_completion`, `get_tool_llm(request, provider)` | Tool-calling chat completions; errors are `UpstreamError` (502), with the provider's body logged, not returned |
 | `embed`, `embed_openai_compatible`, `get_embedder`, `EmbedFn`, `DEFAULT_EMBEDDING_MODEL`, `MAX_EMBED_CHARS` | Embeddings (batched by 50, truncated to 2,000 chars) |
