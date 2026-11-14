@@ -14,7 +14,8 @@ py-libraries/
 │   ├── core/               # wiltech-labs-core: config, database, errors, CORS, health
 │   ├── auth/               # wiltech-labs-auth: Clerk JWT, Caller, require_admin/owner (needs core, rest)
 │   ├── ai/                 # wiltech-labs-ai: providers, LLM, embeddings, vector stores, agent (needs core)
-│   └── holidays/           # wiltech-labs-holidays: locale → public holidays in the UI's shape (needs rest)
+│   ├── holidays/           # wiltech-labs-holidays: locale → public holidays in the UI's shape (needs rest)
+│   └── organization/       # wiltech-labs-organization: org structure rules + org chart items (needs rest)
 ├── docs/
 │   ├── PYTHON_APP_CONVENTIONS.md   # conventions every consuming FastAPI app follows — the
 │   │                               # contract these packages meet

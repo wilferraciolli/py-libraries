@@ -9,6 +9,7 @@ members = [
     "wiltech-labs-auth",
     "wiltech-labs-core",
     "wiltech-labs-holidays",
+    "wiltech-labs-organization",
     "wiltech-labs-rest",
 ]
 
@@ -661,6 +662,29 @@ dev = [
     { name = "httpx" },
     { name = "pytest" },
 ]
+
+[[package]]
+name = "wiltech-labs-organization"
+version = "1.0.0"
+source = { editable = "packages/organization" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "wiltech-labs-rest" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "wiltech-labs-rest", editable = "packages/rest" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest" }]
 
 [[package]]
 name = "wiltech-labs-rest"

@@ -29,19 +29,24 @@ is the master; other apps are brought in line with it later.
       PythonTutorials' `libraries/` staging area, moved here). **Not yet published.**
       `fastapi-template` already imports core + auth (verified against the local packages).
 
+- [x] **`wiltech-labs-ai` 1.0.2** published (2026-11-12): provider fallback (`get_fallback_ai`,
+      `FallbackAI`, `FallbackReply`, `AI_PROVIDERS`), `NotConfiguredError` (503) for a missing
+      key, `UpstreamError` (502) from `AiHttpAdapter`, chat options passed on.
+      `ai-content-generator-api` uses it from PyPI; its `TEMPORARY` copy is deleted. Checked
+      against real Groq and Workers AI answers through that app.
+
 ## Next
 
-- [ ] Review and publish **`wiltech-labs-ai` 1.0.2** (new, 2026-11-12, not committed): provider
-      fallback, `get_fallback_ai(request, ("groq", "cloudflare"))` giving a `FallbackAI` that tries
-      each configured provider in order (`AI_PROVIDERS` overrides it) and returns a
-      `FallbackReply` (`text`, `provider`, `model`, `failed`); unconfigured providers are skipped,
-      every provider failing is one `UpstreamError`. Fixes: `get_ai` raises `NotConfiguredError`
-      (503) for a missing key instead of `RuntimeError` (500); `AiHttpAdapter` raises
-      `UpstreamError` (502) with the body logged instead of `httpx.HTTPStatusError` /
-      `RuntimeError`; `OpenAICompatibleChatAdapter` passes `max_tokens`, `temperature`, `top_p`,
-      `response_format` on. Needed by `wiltech-labs-apps/ContentGenerator/ai-content-generator-api`,
-      which keeps a `TEMPORARY` copy in `src/core/ai/` until this is on PyPI. Tested with fakes and
-      `httpx.MockTransport`, not yet against Groq or Workers AI.
+- [ ] Review and publish **`wiltech-labs-organization` 1.0.0** (new, 2026-11-15, not committed):
+      an organisation's structure. `OrgStructure` checks where a node may sit before an app saves
+      it (`check_add`, `check_move`; `problems`/`check` for a whole structure): one `ORG` at the
+      top; `ORG_ENTITY` under the org or a department, never inside another entity; `DEPARTMENT`
+      under the org, an entity or a department, any depth; `JOB` under a department only.
+      `OrgNode`/`OrgOccupancy` are the chart's items in `@wiltech-labs/ngx-organization` 1.0.1's
+      shape (camelCase; a person in a job is an occupancy on the job, not a node);
+      `org_chart_nodes` attaches who holds each job on a date. Needed by Crewly's org chart, which
+      keeps a `TEMPORARY` copy in `crewly-api/src/wiltech_labs_organization/` until this is on
+      PyPI. 31 tests.
 
 - [x] **`wiltech-labs-holidays` 1.0.0** published (2026-10-23): a locale (`el-CY`) in,
       `PublicHoliday` items (`date`, `name`, `category`, `country`) out, on the `holidays`
