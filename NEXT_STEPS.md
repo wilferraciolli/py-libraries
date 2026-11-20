@@ -37,16 +37,26 @@ is the master; other apps are brought in line with it later.
 
 ## Next
 
-- [ ] Review and publish **`wiltech-labs-organization` 1.0.0** (new, 2026-11-15, not committed):
-      an organisation's structure. `OrgStructure` checks where a node may sit before an app saves
+- [ ] Review and publish **`wiltech-labs-core` 1.1.2** (2026-11-20, not committed): email.
+      `EmailMessage`, the `EmailSender` protocol, `get_email_sender(connection)` choosing from
+      `EMAIL_MODE` (`log`, the default, or `resend`: `RESEND_API_KEY`, `EMAIL_FROM`,
+      `EMAIL_FROM_NAME`), `ResendEmailSender` (one HTTPS call, so it works in a Worker; an
+      `idempotency_key` makes retries safe; a refusal or timeout is `UpstreamError`),
+      `LoggingEmailSender` and `MemoryEmailSender` (tests). Crewly's email notifications keep a
+      `TEMPORARY` copy in `crewly-api/src/core/email/` until it's on PyPI; Insurly's
+      `notifications/email_sender.py` can move onto it after. Also `insert_statements(table,
+      columns, rows)`: multi-row `INSERT`s for `batch()`, each within D1's 100 bound parameters
+      (`D1_MAX_PARAMS`), so Crewly's people import is a few dozen statements, not hundreds
+      (its `TEMPORARY` copy is `crewly-api/src/core/bulk/`). 8 tests; auth and ai still pass.
+
+- [x] **`wiltech-labs-organization` 1.0.0** published (2026-11-15): an organisation's structure. `OrgStructure` checks where a node may sit before an app saves
       it (`check_add`, `check_move`; `problems`/`check` for a whole structure): one `ORG` at the
       top; `ORG_ENTITY` under the org or a department, never inside another entity; `DEPARTMENT`
       under the org, an entity or a department, any depth; `JOB` under a department only.
       `OrgNode`/`OrgOccupancy` are the chart's items in `@wiltech-labs/ngx-organization` 1.0.1's
       shape (camelCase; a person in a job is an occupancy on the job, not a node);
-      `org_chart_nodes` attaches who holds each job on a date. Needed by Crewly's org chart, which
-      keeps a `TEMPORARY` copy in `crewly-api/src/wiltech_labs_organization/` until this is on
-      PyPI. 31 tests.
+      `org_chart_nodes` attaches who holds each job on a date. Crewly's org chart uses it from
+      PyPI (also in its Worker `pylock.toml`); its `TEMPORARY` copy is deleted. 31 tests.
 
 - [x] **`wiltech-labs-holidays` 1.0.0** published (2026-10-23): a locale (`el-CY`) in,
       `PublicHoliday` items (`date`, `name`, `category`, `country`) out, on the `holidays`

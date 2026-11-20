@@ -3,14 +3,15 @@ wiltech-labs-core: the runtime plumbing shared by Wiltech's FastAPI apps.
 
 Config that reads the Worker env or .env, the portable Database protocol
 (SQLite / D1 binding / D1 over HTTP), portable file storage (a local folder /
-an R2 bucket binding), the AppError family, per-request CORS and a health
-router.
+an R2 bucket binding), email (Resend, or a log), the AppError family,
+per-request CORS and a health router.
 
 This module is the entire public surface — import from `wiltech_labs_core`,
 not from its sub-packages.
 """
 from wiltech_labs_core.config import get_binding, get_config, load_dotenv
 from wiltech_labs_core.database import (
+    D1_MAX_PARAMS,
     D1BindingDatabase,
     D1HttpDatabase,
     Database,
@@ -18,7 +19,17 @@ from wiltech_labs_core.database import (
     Statement,
     UniqueConstraintError,
     get_database,
+    insert_statements,
     migrations_dir,
+)
+from wiltech_labs_core.email import (
+    EmailMessage,
+    EmailSender,
+    LoggingEmailSender,
+    MemoryEmailSender,
+    ResendEmailSender,
+    get_email_sender,
+    sender_address,
 )
 from wiltech_labs_core.files import (
     DEFAULT_CONTENT_TYPE,
@@ -44,6 +55,13 @@ from wiltech_labs_core.web import EnvCORSMiddleware, HealthCheck, allowed_origin
 
 __all__ = [
     "DEFAULT_CONTENT_TYPE",
+    "EmailMessage",
+    "EmailSender",
+    "LoggingEmailSender",
+    "MemoryEmailSender",
+    "ResendEmailSender",
+    "get_email_sender",
+    "sender_address",
     "FileStore",
     "LocalFileStore",
     "R2BindingFileStore",
@@ -52,6 +70,7 @@ __all__ = [
     "get_file_store",
     "AppError",
     "ConflictError",
+    "D1_MAX_PARAMS",
     "D1BindingDatabase",
     "D1HttpDatabase",
     "Database",
@@ -71,6 +90,7 @@ __all__ = [
     "get_binding",
     "get_config",
     "get_database",
+    "insert_statements",
     "health_router",
     "load_dotenv",
     "migrations_dir",

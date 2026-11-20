@@ -591,7 +591,7 @@ dev = [
 
 [[package]]
 name = "wiltech-labs-core"
-version = "1.1.1"
+version = "1.1.2"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "fastapi" },

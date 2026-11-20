@@ -72,6 +72,9 @@ await db.batch([
 | `FILE_STORE_MODE` | `get_file_store` | `r2_binding` if the binding exists, else `local` |
 | `FILE_STORE_BINDING` | r2_binding | `FILES` (the R2 bucket binding's name in `wrangler.jsonc`) |
 | `FILES_DIR` | local | `./files` |
+| `EMAIL_MODE` | `get_email_sender` | `log` (`resend` sends) |
+| `RESEND_API_KEY` | resend (a secret: `npx wrangler secret put RESEND_API_KEY`) | — |
+| `EMAIL_FROM`, `EMAIL_FROM_NAME` | resend: the sender, on a domain verified at Resend | —, none |
 
 Values come from the Worker env (`wrangler.jsonc` vars and secrets) first, then the process
 environment. `.env` in the working directory is loaded into the process environment on
@@ -89,11 +92,16 @@ import, without overriding anything already set.
 | `UniqueConstraintError` | Raised by every adapter when a UNIQUE constraint or index fails; repositories turn it into their own `ConflictError` |
 | `get_database(request)` | Chooses an adapter from `DATABASE_MODE` / bindings |
 | `Statement` | `tuple[str, tuple]`, one item of `batch` |
+| `insert_statements(table, columns, rows, max_params=100)`, `D1_MAX_PARAMS` | Multi-row `INSERT`s for `batch`, chunked so none binds more than D1's 100 parameters: a bulk import in a few dozen statements |
 | `migrations_dir()` | The migrations folder, or a `RuntimeError` if it's missing |
 | `FileStore` | Protocol: `put(key, data, content_type)`, `get(key) -> StoredFile \| None`, `delete(key)` |
 | `LocalFileStore(root)`, `R2BindingFileStore(bucket)` | A folder (content type kept beside each file), and a Worker's R2 bucket binding |
 | `get_file_store(request)` | Chooses a store from `FILE_STORE_MODE` / bindings |
 | `StoredFile`, `check_key(key)` | A file read back (`key`, `data`, `content_type`, `size`); keys are slash-separated `[A-Za-z0-9._-]` segments, never `..`, so a user's file name never becomes a path |
+| `EmailMessage(to, subject, html, text, reply_to=None, tags={}, idempotency_key=None)` | One email; `text` for clients that don't show HTML |
+| `EmailSender` | Protocol: `send(message)`, raising `UpstreamError` if the provider refuses it |
+| `get_email_sender(connection)` | Chooses a sender from `EMAIL_MODE`; `connection` is the request, or a cron job's object with a `scope` holding the Worker `env` |
+| `ResendEmailSender(api_key, sender, transport=None)`, `LoggingEmailSender`, `MemoryEmailSender` | Resend's HTTP API; a log; a list (`sent`) for tests. `sender_address(address, name)` makes `Name <address>` |
 | `AppError`, `NotFoundError` (404), `ForbiddenError` (403), `ConflictError` (409), `InvalidInputError` (422), `TooManyRequestsError` (429 + `Retry-After`), `UpstreamError` (502), `NotConfiguredError` (503) | Business errors services raise |
 | `register_error_handlers(app)` | Maps `AppError` to its status code |
 | `EnvCORSMiddleware(app, default_origins="")`, `allowed_origins(scope, default="")` | CORS with origins read per request (fallback `default_origins`); unhandled errors still get CORS headers |
@@ -129,6 +137,22 @@ found = await store.get(f"documents/{org_id}/{document_id}")  # StoredFile or No
 Keys are the app's own; keep the user's file name in the database. Files are held in memory
 whole: fine for documents and images, not for video. On Cloudflare add an R2 bucket binding
 (`"r2_buckets": [{"binding": "FILES", "bucket_name": "..."}]`); locally files land in `FILES_DIR`.
+
+### Email
+
+```python
+from wiltech_labs_core import EmailMessage, get_email_sender
+
+sender = get_email_sender(request)
+await sender.send(EmailMessage(
+    to=("eleni@example.com",), subject="Approve a time correction", html=html, text=text,
+    idempotency_key=f"notification-{notification_id}",  # a retry sends it once
+))
+```
+
+A Worker can't open SMTP connections, so the real sender is one HTTPS request to Resend. Until
+`EMAIL_MODE=resend` and a key are set, messages are only logged. Send from a job or an outbox,
+not inside the request that caused the email: a slow provider then never slows a page.
 
 ### `batch` atomicity
 
